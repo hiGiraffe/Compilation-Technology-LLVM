@@ -57,10 +57,12 @@ public:
     void buildNonTerminalSymbol(Node *parent, Node *child) {
         buildRelationship(parent, child);
     }
-//    void buildNonTerminalSymbolLeft(Node *parent, Node *child){
-//        parent->addChildBegin(child);
-//        child->setParent(parent);
-//    }
+
+    void addBetweenParentAndTheLastNode(Node *parent, Node *add) {
+        Node *child = parent->popChild();
+        buildRelationship(parent, add);
+        buildRelationship(add, child);
+    }
 
     void buildTerminalSymbol(Node *parent, string token) {
         if (curToken != token)
@@ -547,82 +549,99 @@ public:
         return funcRParams;
     }
 
-    // MulExp → UnaryExp | UnaryExp ('*' | '/' | '%') MulExp
+    // MulExp → UnaryExp | MulExp ('*' | '/' | '%') UnaryExp
     Node *parseMulExp() {
         Node *mulExp = new Node(LexicalType::MulExp);
 
         buildNonTerminalSymbol(mulExp, parseUnaryExp());
-        if (curToken == "*") {
-            buildTerminalSymbol(mulExp, "*");
-            buildNonTerminalSymbol(mulExp, parseMulExp());
-        } else if (curToken == "/") {
-            buildTerminalSymbol(mulExp, "/");
-            buildNonTerminalSymbol(mulExp, parseMulExp());
-        } else if (curToken == "%") {
-            buildTerminalSymbol(mulExp, "%");
-            buildNonTerminalSymbol(mulExp, parseMulExp());
+        while (curToken == "*" || curToken == "/" || curToken == "%") {
+            //左边的合并
+            Node *add = new Node(LexicalType::MulExp);
+            addBetweenParentAndTheLastNode(mulExp, add);
+            if (curToken == "*") {
+                buildTerminalSymbol(mulExp, "*");
+            } else if (curToken == "/") {
+                buildTerminalSymbol(mulExp, "/");
+            } else if (curToken == "%") {
+                buildTerminalSymbol(mulExp, "%");
+            }
+            buildNonTerminalSymbol(mulExp, parseUnaryExp());
+
         }
+
         return mulExp;
     }
 
-    // AddExp → MulExp | MulExp ('+' | '−') AddExp
+    // AddExp → MulExp | AddExp ('+' | '−') MulExp
     Node *parseAddExp() {
         Node *addExp = new Node(LexicalType::AddExp);
 
         buildNonTerminalSymbol(addExp, parseMulExp());
-        if (curToken == "+") {
-            buildTerminalSymbol(addExp, "+");
-            buildNonTerminalSymbol(addExp, parseAddExp());
-        } else if (curToken == "-") {
-            buildTerminalSymbol(addExp, "-");
-            buildNonTerminalSymbol(addExp, parseAddExp());
+        while (curToken == "+" || curToken == "-") {
+            Node *add = new Node(LexicalType::AddExp);
+            addBetweenParentAndTheLastNode(addExp, add);
+            if (curToken == "+") {
+                buildTerminalSymbol(addExp, "+");
+            } else if (curToken == "-") {
+                buildTerminalSymbol(addExp, "-");
+            }
+            buildNonTerminalSymbol(addExp, parseMulExp());
         }
+
         return addExp;
     }
 
-    // RelExp → AddExp | AddExp ('<' | '>' | '<=' | '>=') RelExp
+    // RelExp → AddExp | RelExp ('<' | '>' | '<=' | '>=') AddExp
     Node *parseRelExp() {
         Node *relExp = new Node(LexicalType::RelExp);
 
         buildNonTerminalSymbol(relExp, parseAddExp());
-        if (curToken == "<") {
-            buildTerminalSymbol(relExp, "<");
-            buildNonTerminalSymbol(relExp, parseRelExp());
-        } else if (curToken == ">") {
-            buildTerminalSymbol(relExp, ">");
-            buildNonTerminalSymbol(relExp, parseRelExp());
-        } else if (curToken == "<=") {
-            buildTerminalSymbol(relExp, "<=");
-            buildNonTerminalSymbol(relExp, parseRelExp());
-        } else if (curToken == ">=") {
-            buildTerminalSymbol(relExp, ">=");
-            buildNonTerminalSymbol(relExp, parseRelExp());
+        while (curToken == "<" || curToken == ">" || curToken == "<=" || curToken == ">=") {
+            Node *add = new Node(LexicalType::RelExp);
+            addBetweenParentAndTheLastNode(relExp, add);
+            if (curToken == "<") {
+                buildTerminalSymbol(relExp, "<");
+            } else if (curToken == ">") {
+                buildTerminalSymbol(relExp, ">");
+            } else if (curToken == "<=") {
+                buildTerminalSymbol(relExp, "<=");
+            } else if (curToken == ">=") {
+                buildTerminalSymbol(relExp, ">=");
+            }
+            buildNonTerminalSymbol(relExp, parseAddExp());
         }
+
 
         return relExp;
     }
 
-    // EqExp → RelExp | RelExp ('==' | '!=') EqExp
+    // EqExp → RelExp | EqExp ('==' | '!=') RelExp
     Node *parseEqExp() {
         Node *eqExp = new Node(LexicalType::EqExp);
         buildNonTerminalSymbol(eqExp, parseRelExp());
-        if (curToken == "==") {
-            buildTerminalSymbol(eqExp, "==");
-            buildNonTerminalSymbol(eqExp, parseEqExp());
-        } else if (curToken == "!=") {
-            buildTerminalSymbol(eqExp, "!=");
-            buildNonTerminalSymbol(eqExp, parseEqExp());
+        while (curToken == "==" || curToken == "!=") {
+            Node *add = new Node(LexicalType::EqExp);
+            addBetweenParentAndTheLastNode(eqExp, add);
+            if (curToken == "==") {
+                buildTerminalSymbol(eqExp, "==");
+            } else if (curToken == "!=") {
+                buildTerminalSymbol(eqExp, "!=");
+            }
+            buildNonTerminalSymbol(eqExp, parseRelExp());
         }
+
         return eqExp;
     }
 
-    // LAndExp → EqExp |  EqExp '&&' LAndExp
+    // LAndExp → EqExp | LAndExp '&&' EqExp
     Node *parseLAndExp() {
         Node *lAndExp = new Node(LexicalType::LAndExp);
         buildNonTerminalSymbol(lAndExp, parseEqExp());
-        if (curToken == "&&") {
+        while (curToken == "&&") {
+            Node *add = new Node(LexicalType::LAndExp);
+            addBetweenParentAndTheLastNode(lAndExp, add);
             buildTerminalSymbol(lAndExp, "&&");
-            buildNonTerminalSymbol(lAndExp, parseLAndExp());
+            buildNonTerminalSymbol(lAndExp, parseEqExp());
         }
         return lAndExp;
     }
@@ -631,9 +650,12 @@ public:
     Node *parseLOrExp() {
         Node *lOrExp = new Node(LexicalType::LOrExp);
         buildNonTerminalSymbol(lOrExp, parseLAndExp());
-        if (curToken == "||") {
+        while (curToken == "||") {
+            Node *add = new Node(LexicalType::LOrExp);
+            addBetweenParentAndTheLastNode(lOrExp, add);
+
             buildTerminalSymbol(lOrExp, "||");
-            buildNonTerminalSymbol(lOrExp, parseLOrExp());
+            buildNonTerminalSymbol(lOrExp, parseLAndExp());
         }
         return lOrExp;
     }

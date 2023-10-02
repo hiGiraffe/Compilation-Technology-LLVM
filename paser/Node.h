@@ -24,9 +24,12 @@ public:
     void addChild(Node *child) {
         children.insert(children.end(), child);
     }
-    //在左边插入一个节点
-    void addChildBegin(Node *child){
-        children.insert(children.begin(),child);
+
+    //弹出最右边的子节点
+    Node *popChild() {
+        Node *child = children[children.size() - 1];
+        children.pop_back();
+        return child;
     }
 
     //设置父节点
@@ -36,7 +39,7 @@ public:
 
     string getToken_() {
         if (!token_.empty()) {
-            return lexicalTypeToPrint(type)+" "+token_;
+            return lexicalTypeToPrint(type) + " " + token_;
         } else {
             return "<" + lexicalTypeToPrint(type) + ">";
         }
