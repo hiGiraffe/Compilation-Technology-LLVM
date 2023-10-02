@@ -24,6 +24,10 @@ public:
     void addChild(Node *child) {
         children.insert(children.end(), child);
     }
+    //在左边插入一个节点
+    void addChildBegin(Node *child){
+        children.insert(children.begin(),child);
+    }
 
     //设置父节点
     void setParent(Node *parent) {

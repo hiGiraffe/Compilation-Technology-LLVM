@@ -31,7 +31,7 @@ public:
     }
 
     friend ostream &operator<<(ostream &os, const Parser parser) {
-        for (int outputNum = parser.output.size()-1;outputNum>=0;outputNum--) {
+        for (int outputNum = parser.output.size() - 1; outputNum >= 0; outputNum--) {
             os << parser.output[outputNum] << endl;
         }
         return os;
@@ -40,7 +40,7 @@ public:
     void postorderTraversal(Node *parent) {
         output.push_back(parent->getToken_());
         vector<Node *> children = parent->getChildren();
-        for ( int childNum = children.size() - 1; childNum >= 0; childNum--) {
+        for (int childNum = children.size() - 1; childNum >= 0; childNum--) {
             postorderTraversal(children[childNum]);
         }
     }
@@ -57,6 +57,10 @@ public:
     void buildNonTerminalSymbol(Node *parent, Node *child) {
         buildRelationship(parent, child);
     }
+//    void buildNonTerminalSymbolLeft(Node *parent, Node *child){
+//        parent->addChildBegin(child);
+//        child->setParent(parent);
+//    }
 
     void buildTerminalSymbol(Node *parent, string token) {
         if (curToken != token)
@@ -87,7 +91,7 @@ public:
 
         //FuncDef
         while (cur < tokens.size() - 1 && next1Token != "main") {
-            buildNonTerminalSymbol(ancestor, parseFuncType());
+            buildNonTerminalSymbol(ancestor, parseFuncDef());
         }
 
         //MainFuncDef
@@ -176,7 +180,7 @@ public:
         return varDecl;
     }
 
-    // VarDef → Ident { '[' ConstExp ']' }
+    // VarDef → Ident { '[' ConstExp ']' }  ['=' InitVal]
     Node *parseVarDef() {
         Node *varDef = new Node(LexicalType::VarDef);
         //Ident
@@ -186,6 +190,10 @@ public:
             buildTerminalSymbol(varDef, "[");
             buildNonTerminalSymbol(varDef, parseConstExp());
             buildTerminalSymbol(varDef, "]");
+        }
+        if (curToken == "=") {
+            buildTerminalSymbol(varDef, "=");
+            buildNonTerminalSymbol(varDef, parseInitVal());
         }
         return varDef;
     }
@@ -387,13 +395,13 @@ public:
             }
             buildTerminalSymbol(stmt, ")");
             buildTerminalSymbol(stmt, ";");
-        } else if (curType == LexicalType::IDENFR && next2Token != "getint") {
+        } else if (curType == LexicalType::IDENFR && next1Token == "=" && next2Token != "getint") {
             // LVal '=' Exp ';'
             buildNonTerminalSymbol(stmt, parseLVal());
             buildTerminalSymbol(stmt, "=");
             buildNonTerminalSymbol(stmt, parseExp());
             buildTerminalSymbol(stmt, ";");
-        } else if (curType == LexicalType::IDENFR && next2Token == "getint") {
+        } else if (curType == LexicalType::IDENFR && next1Token == "=" && next2Token == "getint") {
             //  LVal '=' 'getint''('')'';'
             buildNonTerminalSymbol(stmt, parseLVal());
             buildTerminalSymbol(stmt, "=");
@@ -405,8 +413,8 @@ public:
             //  [Exp] ';'
             if (curToken != ";") {
                 buildNonTerminalSymbol(stmt, parseExp());
-                buildTerminalSymbol(stmt, ";");
             }
+            buildTerminalSymbol(stmt, ";");
         }
         return stmt;
     }
@@ -467,7 +475,7 @@ public:
         } else if (curType == LexicalType::IDENFR) {
             // LVal
             buildNonTerminalSymbol(primaryExp, parseLVal());
-        } else if (curType == LexicalType::Number) {
+        } else if (curType == LexicalType::INTCON) {
             // Number
             buildNonTerminalSymbol(primaryExp, parseNumber());
         } else {
