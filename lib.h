@@ -7,6 +7,7 @@
 
 using namespace std;
 #include "lexer/lib.h"
+#include "paser/lib.h"
 
 #include "iostream"
 #include "fstream"

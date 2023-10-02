@@ -20,10 +20,29 @@ class Parser {
     int cur;
     vector<Token> tokens;
     Node *ancestor;
+    vector<string> output;
 public:
     explicit Parser(const Lexer &lexer) {
         tokens = lexer.getTokens();
         cur = 0;
+        output.clear();
+        parseCompUnit();
+        postorderTraversal(ancestor);
+    }
+
+    friend ostream &operator<<(ostream &os, const Parser parser) {
+        for (int outputNum = parser.output.size()-1;outputNum>=0;outputNum--) {
+            os << parser.output[outputNum] << endl;
+        }
+        return os;
+    }
+
+    void postorderTraversal(Node *parent) {
+        output.push_back(parent->getToken_());
+        vector<Node *> children = parent->getChildren();
+        for ( int childNum = children.size() - 1; childNum >= 0; childNum--) {
+            postorderTraversal(children[childNum]);
+        }
     }
 
     void error() {
@@ -285,10 +304,22 @@ public:
     // Block → '{' { BlockItem } '}'
     // BlockItem → Decl | Stmt
     Node *parseBlock() {
-        Node* = new Node(LexicalType::);
+        Node *block = new Node(LexicalType::Block);
+        buildTerminalSymbol(block, "{");
 
+        while (curToken != "}") {
+            if (curToken == "const") {
+                buildNonTerminalSymbol(block, parseConstDecl());
+            } else if (curToken == "int") {
+                buildNonTerminalSymbol(block, parseVarDecl());
+            } else {
+                buildNonTerminalSymbol(block, parseStmt());
+            }
+        }
 
-        return;
+        buildTerminalSymbol(block, "}");
+
+        return block;
     }
 
     // Stmt → LVal '=' Exp ';'
@@ -301,68 +332,185 @@ public:
     // | LVal '=' 'getint''('')'';'
     // | 'printf''('FormatString{','Exp}')'';'
     Node *parseStmt() {
-        Node* = new Node(LexicalType::);
-
-
-        return;
+        Node *stmt = new Node(LexicalType::Stmt);
+        if (curToken == "{") {
+            //  Block
+            buildNonTerminalSymbol(stmt, parseBlock());
+        } else if (curToken == "if") {
+            //  'if' '(' Cond ')' Stmt [ 'else' Stmt ]
+            buildTerminalSymbol(stmt, "if");
+            buildTerminalSymbol(stmt, "(");
+            buildNonTerminalSymbol(stmt, parseCond());
+            buildTerminalSymbol(stmt, ")");
+            buildNonTerminalSymbol(stmt, parseStmt());
+            if (curToken == "else") {
+                buildTerminalSymbol(stmt, "else");
+                buildNonTerminalSymbol(stmt, parseStmt());
+            }
+        } else if (curToken == "for") {
+            //  'for' '(' [ForStmt] ';' [Cond] ';' [forStmt] ')' Stmt
+            buildTerminalSymbol(stmt, "for");
+            buildTerminalSymbol(stmt, "(");
+            if (curToken != ";")
+                buildNonTerminalSymbol(stmt, parseForStmt());
+            buildTerminalSymbol(stmt, ";");
+            if (curToken != ";")
+                buildNonTerminalSymbol(stmt, parseCond());
+            buildTerminalSymbol(stmt, ";");
+            if (curToken != ")")
+                buildNonTerminalSymbol(stmt, parseForStmt());
+            buildTerminalSymbol(stmt, ")");
+            buildNonTerminalSymbol(stmt, parseStmt());
+        } else if (curToken == "break") {
+            //  'break' ';'
+            buildTerminalSymbol(stmt, "break");
+            buildTerminalSymbol(stmt, ";");
+        } else if (curToken == "continue") {
+            //'continue' ';'
+            buildTerminalSymbol(stmt, "continue");
+            buildTerminalSymbol(stmt, ";");
+        } else if (curToken == "return") {
+            //  'return' [Exp] ';'
+            buildTerminalSymbol(stmt, "return");
+            if (curToken != ";") {
+                buildNonTerminalSymbol(stmt, parseExp());
+            }
+            buildTerminalSymbol(stmt, ";");
+        } else if (curToken == "printf") {
+            //  'printf''('FormatString{','Exp}')'';'
+            buildTerminalSymbol(stmt, "printf");
+            buildTerminalSymbol(stmt, "(");
+            buildTerminalSymbol(stmt, LexicalType::STRCON);
+            while (curToken == ",") {
+                buildTerminalSymbol(stmt, ",");
+                buildNonTerminalSymbol(stmt, parseExp());
+            }
+            buildTerminalSymbol(stmt, ")");
+            buildTerminalSymbol(stmt, ";");
+        } else if (curType == LexicalType::IDENFR && next2Token != "getint") {
+            // LVal '=' Exp ';'
+            buildNonTerminalSymbol(stmt, parseLVal());
+            buildTerminalSymbol(stmt, "=");
+            buildNonTerminalSymbol(stmt, parseExp());
+            buildTerminalSymbol(stmt, ";");
+        } else if (curType == LexicalType::IDENFR && next2Token == "getint") {
+            //  LVal '=' 'getint''('')'';'
+            buildNonTerminalSymbol(stmt, parseLVal());
+            buildTerminalSymbol(stmt, "=");
+            buildTerminalSymbol(stmt, "getint");
+            buildTerminalSymbol(stmt, "(");
+            buildTerminalSymbol(stmt, ")");
+            buildTerminalSymbol(stmt, ";");
+        } else {
+            //  [Exp] ';'
+            if (curToken != ";") {
+                buildNonTerminalSymbol(stmt, parseExp());
+                buildTerminalSymbol(stmt, ";");
+            }
+        }
+        return stmt;
     }
 
     // ForStmt → LVal '=' Exp
     Node *parseForStmt() {
-        Node* = new Node(LexicalType::);
+        Node *forStmt = new Node(LexicalType::ForStmt);
+        //LVal
+        buildNonTerminalSymbol(forStmt, parseLVal());
+        // '='
+        buildTerminalSymbol(forStmt, "=");
+        // Exp
+        buildNonTerminalSymbol(forStmt, parseExp());
 
-
-        return;
+        return forStmt;
     }
 
     // Exp → AddExp
     Node *parseExp() {
-        Node* = new Node(LexicalType::);
-
-
-        return;
+        Node *exp = new Node(LexicalType::Exp);
+        buildNonTerminalSymbol(exp, parseAddExp());
+        return exp;
     }
 
     // Cond → LOrExp
     Node *parseCond() {
-        Node* = new Node(LexicalType::);
-
-
-        return;
+        Node *cond = new Node(LexicalType::Cond);
+        buildNonTerminalSymbol(cond, parseLOrExp());
+        return cond;
     }
 
     // LVal → Ident {'[' Exp ']'}
     Node *parseLVal() {
-        Node* = new Node(LexicalType::);
+        Node *lVal = new Node(LexicalType::LVal);
+        //Ident
+        buildTerminalSymbol(lVal, LexicalType::IDENFR);
+        // {'[' Exp ']'}
+        while (curToken == "[") {
+            buildTerminalSymbol(lVal, "[");
+            buildNonTerminalSymbol(lVal, parseExp());
+            buildTerminalSymbol(lVal, "]");
+        }
 
-
-        return;
+        return lVal;
     }
 
     // PrimaryExp → '(' Exp ')' | LVal | Number
     Node *parsePrimaryExp() {
-        Node* = new Node(LexicalType::);
+        Node *primaryExp = new Node(LexicalType::PrimaryExp);
 
+        if (curToken == "(") {
+            //'('
+            buildTerminalSymbol(primaryExp, "(");
+            // Exp
+            buildNonTerminalSymbol(primaryExp, parseExp());
+            // ')'
+            buildTerminalSymbol(primaryExp, ")");
+        } else if (curType == LexicalType::IDENFR) {
+            // LVal
+            buildNonTerminalSymbol(primaryExp, parseLVal());
+        } else if (curType == LexicalType::Number) {
+            // Number
+            buildNonTerminalSymbol(primaryExp, parseNumber());
+        } else {
+            error();
+        }
 
-        return;
+        return primaryExp;
     }
 
     // Number → IntConst
     Node *parseNumber() {
-        Node* = new Node(LexicalType::);
-
-
-        return;
+        Node *number = new Node(LexicalType::Number);
+        //IntConst
+        buildTerminalSymbol(number, LexicalType::INTCON);
+        return number;
     }
 
     // UnaryExp → PrimaryExp
     // | Ident '(' [FuncRParams] ')'
     // | UnaryOp UnaryExp
     Node *parseUnaryExp() {
-        Node* = new Node(LexicalType::);
-
-
-        return;
+        Node *unaryExp = new Node(LexicalType::UnaryExp);
+        if (curType == LexicalType::IDENFR && next1Token == "(") {
+            //Ident
+            buildTerminalSymbol(unaryExp, LexicalType::IDENFR);
+            // '('
+            buildTerminalSymbol(unaryExp, "(");
+            // [FuncRParams]
+            if (curToken != ")") {
+                buildNonTerminalSymbol(unaryExp, parseFuncRParams());
+            }
+            // ')'
+            buildTerminalSymbol(unaryExp, ")");
+        } else if (curToken == "+" || curToken == "-" || curToken == "!") {
+            //UnaryOp
+            buildNonTerminalSymbol(unaryExp, parseUnaryOp());
+            // UnaryExp
+            buildNonTerminalSymbol(unaryExp, parseUnaryExp());
+        } else {
+            // PrimaryExp
+            buildNonTerminalSymbol(unaryExp, parsePrimaryExp());
+        }
+        return unaryExp;
     }
 
     // UnaryOp → '+' | '−' | '!'

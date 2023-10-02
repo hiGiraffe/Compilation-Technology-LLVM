@@ -18,16 +18,30 @@ class Node {
 public:
     explicit Node(LexicalType lexicalType, string token) : type(lexicalType), token_(token) {}
 
-    explicit Node(LexicalType lexicalType) : type(lexicalType), token_(nullptr) {}
+    explicit Node(LexicalType lexicalType) : type(lexicalType), token_(string()) {}
 
-    void addChild(Node *child);  //在右边插入一个子节点
-    void setParent(Node *parent); //设置父节点
+    //在右边插入一个子节点
+    void addChild(Node *child) {
+        children.insert(children.end(), child);
+    }
+
+    //设置父节点
+    void setParent(Node *parent) {
+        this->parent_ = parent;
+    }
+
+    string getToken_() {
+        if (!token_.empty()) {
+            return lexicalTypeToPrint(type)+" "+token_;
+        } else {
+            return "<" + lexicalTypeToPrint(type) + ">";
+        }
+    }
+
+    vector<Node *> getChildren() {
+        return children;
+    }
+
 };
 
-void Node::addChild(Node *child) {
-    children.insert(children.end(), child);
-}
-void Node::setParent(Node *parent) {
-    this->parent_ = parent;
-}
 #endif //PASER_NODE_H
