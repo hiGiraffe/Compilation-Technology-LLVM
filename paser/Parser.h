@@ -78,6 +78,14 @@ public:
         cur++;
     }
 
+    bool isExp() {
+        for (int count = 0; cur + count < tokens.size(); count++) {
+            if (tokens[cur + count].getToken() == "=") return false;
+            else if (tokens[cur + count].getToken() == ";") return true;
+        }
+        return false;
+    }
+
     // CompUnit → {Decl} {FuncDef} MainFuncDef
     // ConstDecl | VarDecl
     void parseCompUnit() {
@@ -397,26 +405,27 @@ public:
             }
             buildTerminalSymbol(stmt, ")");
             buildTerminalSymbol(stmt, ";");
-        } else if (curType == LexicalType::IDENFR && next1Token == "=" && next2Token != "getint") {
-            // LVal '=' Exp ';'
-            buildNonTerminalSymbol(stmt, parseLVal());
-            buildTerminalSymbol(stmt, "=");
-            buildNonTerminalSymbol(stmt, parseExp());
-            buildTerminalSymbol(stmt, ";");
-        } else if (curType == LexicalType::IDENFR && next1Token == "=" && next2Token == "getint") {
-            //  LVal '=' 'getint''('')'';'
-            buildNonTerminalSymbol(stmt, parseLVal());
-            buildTerminalSymbol(stmt, "=");
-            buildTerminalSymbol(stmt, "getint");
-            buildTerminalSymbol(stmt, "(");
-            buildTerminalSymbol(stmt, ")");
-            buildTerminalSymbol(stmt, ";");
-        } else {
+        } else if (isExp()) {
             //  [Exp] ';'
             if (curToken != ";") {
                 buildNonTerminalSymbol(stmt, parseExp());
             }
             buildTerminalSymbol(stmt, ";");
+        }else {
+            //  LVal '='
+            buildNonTerminalSymbol(stmt, parseLVal());
+            buildTerminalSymbol(stmt, "=");
+            if(curToken=="getint"){
+                //'getint''('')'';'
+                buildTerminalSymbol(stmt, "getint");
+                buildTerminalSymbol(stmt, "(");
+                buildTerminalSymbol(stmt, ")");
+                buildTerminalSymbol(stmt, ";");
+            }else{
+                //Exp ';'
+                buildNonTerminalSymbol(stmt, parseExp());
+                buildTerminalSymbol(stmt, ";");
+            }
         }
         return stmt;
     }
