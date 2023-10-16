@@ -56,7 +56,7 @@ private:
                         } else if (nextCharacter == '*') {
                             //读到*/
                             while (currentCharacter != '*' || nextCharacter != '/') {
-                                if (charNum + 1 < line.length() - 1) {
+                                if (line.length()>=1&&charNum + 1 < line.length() - 1) {
                                     charNum++;
                                 } else if (lineNum < sourceFile.size() - 1) {
                                     lineNum++;

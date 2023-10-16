@@ -19,6 +19,7 @@ int main() {
 
     Parser parser(lexer);
 
+//    outfile << lexer;
     outfile << parser;
 
 
