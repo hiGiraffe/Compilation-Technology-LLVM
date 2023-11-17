@@ -7,6 +7,7 @@
 
 #include "vector"
 #include "../lexer/lib.h"
+#include "../semanticAnalyzer/ErrorType.h"
 
 using namespace std;
 
@@ -14,11 +15,22 @@ class Node {
     LexicalType type;
     string token_;
     vector<Node *> children = {};
+    int lineNum_;
     Node *parent_;
-public:
-    explicit Node(LexicalType lexicalType, string token) : type(lexicalType), token_(token) {}
 
-    explicit Node(LexicalType lexicalType) : type(lexicalType), token_(string()) {}
+    ErrorType errorType_;
+    bool isErrorNode;
+
+public:
+    //终结符
+    explicit Node(LexicalType lexicalType, string token, int lineNum) : type(lexicalType), token_(token),
+                                                                        lineNum_(lineNum), isErrorNode(false) {}
+
+    //非终结符
+    explicit Node(LexicalType lexicalType) : type(lexicalType), token_(string()), isErrorNode(false) {}
+
+    //错误节点
+//    explicit Node(ErrorType errorType, int lineNum) : errorType_(errorType), lineNum_(lineNum), isErrorNode(true) {}
 
     //在右边插入一个子节点
     void addChild(Node *child) {
@@ -38,15 +50,45 @@ public:
     }
 
     string getToken_() {
-        if (!token_.empty()) {
+        if(isErrorNode){
+            return errorTypeToPrint(errorType_);
+        }
+        else if (!token_.empty()) {
             return lexicalTypeToPrint(type) + " " + token_;
+            //+ " " + to_string(lineNum_)
         } else {
             return "<" + lexicalTypeToPrint(type) + ">";
         }
     }
 
+    string getPureToken(){
+        return token_;
+    }
+    LexicalType getType(){
+        return type;
+    }
+
+    int getLine(){
+        return lineNum_;
+    }
+
     vector<Node *> getChildren() {
         return children;
+    }
+
+    Node* getChild(int i){
+        return children[i];
+    }
+    Node* getParent(){
+        return parent_;
+    }
+
+    bool getIsErrorNode(){
+        return isErrorNode;
+    }
+
+    int getSize(){
+        return children.size();
     }
 
 };

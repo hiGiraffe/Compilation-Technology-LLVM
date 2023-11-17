@@ -6,9 +6,11 @@
 #define LEXER_LEXER_H
 using namespace std;
 
+#include <map>
 #include "Source.h"
 #include "LexicalType.h"
 #include "Token.h"
+#include "../semanticAnalyzer/ErrorType.h"
 
 #define line sourceFile[lineNum]
 #define currentCharacter line[charNum]
@@ -26,8 +28,9 @@ charNum++;\
 class Lexer {
     vector<string> sourceFile;
     vector<Token> tokens;
+    map<int, string> &errorLog_;
 public:
-    explicit Lexer(Source &source) {
+    explicit Lexer(Source &source, map<int, string> &errorLog) : errorLog_(errorLog) {
         sourceFile = source.getSourceFile();
         lexicalAnalysis();
     }
@@ -35,6 +38,7 @@ public:
     vector<Token> getTokens() const {
         return tokens;
     }
+
     friend ostream &operator<<(ostream &os, const Lexer lexer) {
         for (auto &token: lexer.tokens) {
             os << token << endl;
@@ -56,7 +60,7 @@ private:
                         } else if (nextCharacter == '*') {
                             //读到*/
                             while (currentCharacter != '*' || nextCharacter != '/') {
-                                if (line.length()>=1&&charNum + 1 < line.length() - 1) {
+                                if (line.length() >= 1 && charNum + 1 < line.length() - 1) {
                                     charNum++;
                                 } else if (lineNum < sourceFile.size() - 1) {
                                     lineNum++;
@@ -100,7 +104,7 @@ private:
                         tokens.push_back((Token("%", LexicalType::MOD, lineNum)));
                         break;
                     case '<':
-                        if (charNum +1< line.length() && nextCharacter == '=') {
+                        if (charNum + 1 < line.length() && nextCharacter == '=') {
                             tokens.push_back((Token("<=", LexicalType::LEQ, lineNum)));
                             charNum++;
                         } else {
@@ -108,7 +112,7 @@ private:
                         }
                         break;
                     case '>':
-                        if (charNum +1< line.length() && nextCharacter == '=') {
+                        if (charNum + 1 < line.length() && nextCharacter == '=') {
                             tokens.push_back((Token(">=", LexicalType::GEQ, lineNum)));
                             charNum++;
                         } else {
@@ -116,7 +120,7 @@ private:
                         }
                         break;
                     case '=':
-                        if (charNum +1< line.length() && nextCharacter == '=') {
+                        if (charNum + 1 < line.length() && nextCharacter == '=') {
                             tokens.push_back((Token("==", LexicalType::EQL, lineNum)));
                             charNum++;
                         } else {
@@ -124,7 +128,7 @@ private:
                         }
                         break;
                     case '!':
-                        if (charNum +1< line.length() && nextCharacter == '=') {
+                        if (charNum + 1 < line.length() && nextCharacter == '=') {
                             tokens.push_back((Token("!=", LexicalType::NEQ, lineNum)));
                             charNum++;
                         } else {
@@ -162,6 +166,9 @@ private:
                         bool isAfterBackslash = false;
                         while (charNum < line.length()) {
                             if (isAfterBackslash) {
+                                if (currentCharacter != 'n') {
+                                    errorLog_.insert(make_pair(lineNum+1, errorTypeToPrint(ErrorType::IllegalSymbol)));
+                                }
                                 isAfterBackslash = false;
                                 tmpStr.push_back(currentCharacter);
                                 charNum++;
@@ -172,7 +179,20 @@ private:
                                 tmpStr.push_back(currentCharacter);
                                 isAfterBackslash = true;
                                 charNum++;
+                            } else if (currentCharacter == '%') { //读入%d
+                                tmpStr.push_back(currentCharacter);
+                                charNum++;
+                                if (currentCharacter != 'd') {
+                                    errorLog_.insert(make_pair(lineNum+1, errorTypeToPrint(ErrorType::IllegalSymbol)));
+                                }
+                                tmpStr.push_back(currentCharacter);
+                                charNum++;
                             } else {
+                                if ((currentCharacter != 32 && currentCharacter != 33 && currentCharacter < 40)
+                                    ||
+                                    currentCharacter > 126) {
+                                    errorLog_.insert(make_pair(lineNum+1, errorTypeToPrint(ErrorType::IllegalSymbol)));
+                                }
                                 tmpStr.push_back(currentCharacter);
                                 charNum++;
                             }

@@ -8,5 +8,6 @@
 #include "Source.h"
 #include "Lexer.h"
 #include "LexicalType.h"
+#include "Token.h"
 
 #endif //LEXER_LIB_H

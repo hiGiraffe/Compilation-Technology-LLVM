@@ -13,17 +13,24 @@ int main() {
     ofstream outfile;
     outfile.open("output.txt");
 
+    ofstream errfile;
+    errfile.open("error.txt");
+
     Source source(infile);
+    map<int, string> errorLog;
+    Lexer lexer(source, errorLog);
 
-    Lexer lexer(source);
+    Parser parser(lexer, errorLog);
 
-    Parser parser(lexer);
+    SemanticAnalyzer semanticAnalyzer(parser, errorLog);
 
 //    outfile << lexer;
     outfile << parser;
+    errfile << semanticAnalyzer;
 
 
     infile.close();
     outfile.close();
+    errfile.close();
     return 0;
 }

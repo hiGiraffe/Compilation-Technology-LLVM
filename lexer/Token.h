@@ -12,15 +12,15 @@ using namespace std;
 class Token {
     string token;
     LexicalType type;
-    int line;
-    int number;
+    int lineNum;
+//    int number;
 public:
-    explicit Token(string token, LexicalType type, int line) : token(token), type(type), line(line) {
-        if (type == LexicalType::INTCON) {
-            number = stoi(token);
-        } else {
-            number = 0;
-        }
+    explicit Token(string token, LexicalType type, int line) : token(token), type(type), lineNum(line+1) {
+//        if (type == LexicalType::INTCON) {
+//            number = stoi(token);
+//        } else {
+//            number = 0;
+//        }
     }
 
     string getToken (){
@@ -28,6 +28,10 @@ public:
     }
     LexicalType getType(){
         return type;
+    }
+
+    int getLineNum(){
+        return lineNum;
     }
 
     friend ostream &operator<<(ostream &os, const Token token) {

@@ -2,6 +2,13 @@
 // Created by 11863 on 2023/9/30.
 //
 
+/*
+ * 错误处理
+ * 缺少分号 i
+ * 缺少右小括号 j
+ * 缺少右中括号 k
+ */
+
 #ifndef PASER_PARSER_H
 #define PASER_PARSER_H
 
@@ -9,25 +16,34 @@
 #define next1Token tokens[cur+1].getToken()
 #define next2Token tokens[cur+2].getToken()
 #define curType tokens[cur].getType()
+#define curLineNum tokens[cur].getLineNum()
+#define beforeLineNum tokens[cur-1].getLineNum()
 
 using namespace std;
 
 #include "vector"
 #include "../lexer/Token.h"
 #include "Node.h"
+#include "../semanticAnalyzer/ErrorType.h"
+
 
 class Parser {
     int cur;
     vector<Token> tokens;
     Node *ancestor;
     vector<string> output;
+    map<int, string> &errorLog_;
 public:
-    explicit Parser(const Lexer &lexer) {
+    explicit Parser(const Lexer &lexer, map<int, string> &errorLog) : errorLog_(errorLog) {
         tokens = lexer.getTokens();
         cur = 0;
         output.clear();
         parseCompUnit();
         postorderTraversal(ancestor);
+    }
+
+    Node *getAncestor() {
+        return ancestor;
     }
 
     friend ostream &operator<<(ostream &os, const Parser parser) {
@@ -46,7 +62,7 @@ public:
     }
 
     void error() {
-
+        cout << "error" << endl;
     }
 
     void buildRelationship(Node *parent, Node *child) {
@@ -64,17 +80,45 @@ public:
         buildRelationship(add, child);
     }
 
+    //可以补充一个对的回去
+    void buildErrorSymbol(Node *parent, ErrorType errorType) {
+        errorLog_.insert(make_pair(beforeLineNum, errorTypeToPrint(errorType)));
+        LexicalType type;
+        string token;
+        switch (errorType) {
+            //缺少分号 i
+            case ErrorType::MissingSEMICN:
+                type=LexicalType::SEMICN;
+                token =";";
+                break;
+
+            //缺少右小括号’)’ j
+            case ErrorType::MissingRPARENT:
+                type=LexicalType::RPARENT;
+                token =")";
+                break;
+
+            //缺少右中括号’]’ k
+            case ErrorType::MissingRBRACK:
+                type=LexicalType::RBRACK;
+                token ="]";
+                break;
+        }
+        buildRelationship(parent, new Node(type, token, beforeLineNum));
+    }
+
     void buildTerminalSymbol(Node *parent, string token) {
-        if (curToken != token)
+        if (curToken != token) {
             error();
-        buildRelationship(parent, new Node(curType, curToken));
+        }
+        buildRelationship(parent, new Node(curType, curToken, curLineNum));
         cur++;
     }
 
     void buildTerminalSymbol(Node *parent, LexicalType type) {
         if (curType != type)
             error();
-        buildRelationship(parent, new Node(curType, curToken));
+        buildRelationship(parent, new Node(curType, curToken, curLineNum));
         cur++;
     }
 
@@ -126,7 +170,10 @@ public:
             buildNonTerminalSymbol(constDecl, parseConstDef());
         }
         //;
-        buildTerminalSymbol(constDecl, ";");
+        if (curToken == ";")
+            buildTerminalSymbol(constDecl, ";");
+        else
+            buildErrorSymbol(constDecl, ErrorType::MissingSEMICN);
 
         return constDecl;
     }
@@ -140,7 +187,10 @@ public:
         while (curToken == "[") {
             buildTerminalSymbol(constDef, "[");
             buildNonTerminalSymbol(constDef, parseConstExp());
-            buildTerminalSymbol(constDef, "]");
+            if (curToken == "]")
+                buildTerminalSymbol(constDef, "]");
+            else
+                buildErrorSymbol(constDef, ErrorType::MissingRBRACK);
         }
         // '='
         buildTerminalSymbol(constDef, "=");
@@ -186,7 +236,10 @@ public:
             buildNonTerminalSymbol(varDecl, parseVarDef());
         }
         // ';'
-        buildTerminalSymbol(varDecl, ";");
+        if (curToken == ";")
+            buildTerminalSymbol(varDecl, ";");
+        else
+            buildErrorSymbol(varDecl, ErrorType::MissingSEMICN);
         return varDecl;
     }
 
@@ -199,7 +252,10 @@ public:
         while (curToken == "[") {
             buildTerminalSymbol(varDef, "[");
             buildNonTerminalSymbol(varDef, parseConstExp());
-            buildTerminalSymbol(varDef, "]");
+            if (curToken == "]")
+                buildTerminalSymbol(varDef, "]");
+            else
+                buildErrorSymbol(varDef, ErrorType::MissingRBRACK);
         }
         if (curToken == "=") {
             buildTerminalSymbol(varDef, "=");
@@ -240,11 +296,14 @@ public:
         // '('
         buildTerminalSymbol(funcDef, "(");
         // [FuncFParams]
-        if (curToken != ")") {
+        if (curToken != ")"&&curToken!="{") {
             buildNonTerminalSymbol(funcDef, parseFuncFParams());
         }
         // ')'
-        buildTerminalSymbol(funcDef, ")");
+        if (curToken == ")")
+            buildTerminalSymbol(funcDef, ")");
+        else
+            buildErrorSymbol(funcDef, ErrorType::MissingRPARENT);
         // Block
         buildNonTerminalSymbol(funcDef, parseBlock());
 
@@ -307,12 +366,18 @@ public:
             //'['
             buildTerminalSymbol(funcFParam, "[");
             // ']'
-            buildTerminalSymbol(funcFParam, "]");
+            if (curToken == "]")
+                buildTerminalSymbol(funcFParam, "]");
+            else
+                buildErrorSymbol(funcFParam, ErrorType::MissingRBRACK);
             // { '[' ConstExp ']' }
             while (curToken == "[") {
                 buildTerminalSymbol(funcFParam, "[");
                 buildNonTerminalSymbol(funcFParam, parseConstExp());
-                buildTerminalSymbol(funcFParam, "]");
+                if (curToken == "]")
+                    buildTerminalSymbol(funcFParam, "]");
+                else
+                    buildErrorSymbol(funcFParam, ErrorType::MissingRBRACK);
             }
         }
 
@@ -359,7 +424,10 @@ public:
             buildTerminalSymbol(stmt, "if");
             buildTerminalSymbol(stmt, "(");
             buildNonTerminalSymbol(stmt, parseCond());
-            buildTerminalSymbol(stmt, ")");
+            if (curToken == ")")
+                buildTerminalSymbol(stmt, ")");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingRPARENT);
             buildNonTerminalSymbol(stmt, parseStmt());
             if (curToken == "else") {
                 buildTerminalSymbol(stmt, "else");
@@ -371,29 +439,47 @@ public:
             buildTerminalSymbol(stmt, "(");
             if (curToken != ";")
                 buildNonTerminalSymbol(stmt, parseForStmt());
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
             if (curToken != ";")
                 buildNonTerminalSymbol(stmt, parseCond());
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
             if (curToken != ")")
                 buildNonTerminalSymbol(stmt, parseForStmt());
-            buildTerminalSymbol(stmt, ")");
+            if (curToken == ")")
+                buildTerminalSymbol(stmt, ")");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingRPARENT);
             buildNonTerminalSymbol(stmt, parseStmt());
         } else if (curToken == "break") {
             //  'break' ';'
             buildTerminalSymbol(stmt, "break");
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
         } else if (curToken == "continue") {
             //'continue' ';'
             buildTerminalSymbol(stmt, "continue");
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
         } else if (curToken == "return") {
             //  'return' [Exp] ';'
             buildTerminalSymbol(stmt, "return");
             if (curToken != ";") {
                 buildNonTerminalSymbol(stmt, parseExp());
             }
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
         } else if (curToken == "printf") {
             //  'printf''('FormatString{','Exp}')'';'
             buildTerminalSymbol(stmt, "printf");
@@ -403,28 +489,46 @@ public:
                 buildTerminalSymbol(stmt, ",");
                 buildNonTerminalSymbol(stmt, parseExp());
             }
-            buildTerminalSymbol(stmt, ")");
-            buildTerminalSymbol(stmt, ";");
+            if (curToken == ")")
+                buildTerminalSymbol(stmt, ")");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingRPARENT);
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
         } else if (isExp()) {
             //  [Exp] ';'
             if (curToken != ";") {
                 buildNonTerminalSymbol(stmt, parseExp());
             }
-            buildTerminalSymbol(stmt, ";");
-        }else {
+            if (curToken == ";")
+                buildTerminalSymbol(stmt, ";");
+            else
+                buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
+        } else {
             //  LVal '='
             buildNonTerminalSymbol(stmt, parseLVal());
             buildTerminalSymbol(stmt, "=");
-            if(curToken=="getint"){
+            if (curToken == "getint") {
                 //'getint''('')'';'
                 buildTerminalSymbol(stmt, "getint");
                 buildTerminalSymbol(stmt, "(");
-                buildTerminalSymbol(stmt, ")");
-                buildTerminalSymbol(stmt, ";");
-            }else{
+                if (curToken == ")")
+                    buildTerminalSymbol(stmt, ")");
+                else
+                    buildErrorSymbol(stmt, ErrorType::MissingRPARENT);
+                if (curToken == ";")
+                    buildTerminalSymbol(stmt, ";");
+                else
+                    buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
+            } else {
                 //Exp ';'
                 buildNonTerminalSymbol(stmt, parseExp());
-                buildTerminalSymbol(stmt, ";");
+                if (curToken == ";")
+                    buildTerminalSymbol(stmt, ";");
+                else
+                    buildErrorSymbol(stmt, ErrorType::MissingSEMICN);
             }
         }
         return stmt;
@@ -466,7 +570,10 @@ public:
         while (curToken == "[") {
             buildTerminalSymbol(lVal, "[");
             buildNonTerminalSymbol(lVal, parseExp());
-            buildTerminalSymbol(lVal, "]");
+            if (curToken == "]")
+                buildTerminalSymbol(lVal, "]");
+            else
+                buildErrorSymbol(lVal, ErrorType::MissingRBRACK);
         }
 
         return lVal;
@@ -515,11 +622,14 @@ public:
             // '('
             buildTerminalSymbol(unaryExp, "(");
             // [FuncRParams]
-            if (curToken != ")") {
+            if (curToken != ")"&&curToken!=";") {
                 buildNonTerminalSymbol(unaryExp, parseFuncRParams());
             }
             // ')'
-            buildTerminalSymbol(unaryExp, ")");
+            if (curToken == ")")
+                buildTerminalSymbol(unaryExp, ")");
+            else
+                buildErrorSymbol(unaryExp, ErrorType::MissingRPARENT);
         } else if (curToken == "+" || curToken == "-" || curToken == "!") {
             //UnaryOp
             buildNonTerminalSymbol(unaryExp, parseUnaryOp());
