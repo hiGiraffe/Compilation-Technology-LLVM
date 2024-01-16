@@ -36,35 +36,81 @@ public:
         NOTHING,
     };
 
-    explicit Symbol(Node *node, Type type) : node_(node), type_(type),typesOfParams() {}
+    explicit Symbol(Node *node, Type type) : node_(node), type_(type), typesOfParams(), sizeOfArray(),
+                                             symbolOfParams() {}
 
     string getToken() {
         return node_->getPureToken();
     }
 
-    void addParam(Type type){
+    void addParam(Type type) {
         typesOfParams.push_back(type);
     }
 
-    bool isNotCon(){
-        return type_!=VAR_CONST &&type_!=ONE_DIMENSION_CONST &&type_!=TWO_DIMENSIONS_CONST ;
+    bool isNotCon() {
+        return type_ != VAR_CONST && type_ != ONE_DIMENSION_CONST && type_ != TWO_DIMENSIONS_CONST;
     }
 
-    Type getType(){
+    Type getType() {
         return type_;
     }
 
-    int getLine(){
+    int getLine() {
         return node_->getLine();
     }
 
-    int getSizeOfParams(){
+    //参数个数
+    int getSizeOfParams() {
         return typesOfParams.size();
     }
 
-    Type getTypeAt(int i){
+    Type getTypeAt(int i) {
         return typesOfParams.at(i);
     }
+
+    void setGlobalVaclTrue() {
+        isGlobalVacl = true;
+    }
+
+    bool isGlobal() {
+        return isGlobalVacl;
+    }
+
+    string getOp() {
+        if (isGlobalVacl)
+            return "@" + getToken();
+        else
+            return node_->getOp();
+    }
+
+    int getNum() {
+        return node_->getNum();
+    }
+
+    void setNum(int num) {
+        node_->setNum(num);
+    }
+
+    void addSizeOfArray(int num) {
+        sizeOfArray.push_back(num);
+    }
+
+    int getSizeOfArray(int num) {
+        return sizeOfArray.at(num);
+    }
+
+    void addSymbolOfParam(Symbol *symbol) {
+        symbolOfParams.push_back(symbol);
+    }
+
+    Symbol *getSymbol(int i) {
+        return symbolOfParams.at(i);
+    }
+
+    Node *getNode() {
+        return node_;
+    }
+
 private:
     //语法信息
     Node *node_;
@@ -72,8 +118,12 @@ private:
     Type type_;
     //函数参数类型
     vector<Type> typesOfParams;
-    //数组每一维度大小
-    //大小
+    //函数参数
+    vector<Symbol *> symbolOfParams;
+    //数组大小
+    vector<int> sizeOfArray;
+    //是否为全局变量
+    bool isGlobalVacl = false;
 };
 
 #endif //SEMANTICANALYZER_SYMBOL_H

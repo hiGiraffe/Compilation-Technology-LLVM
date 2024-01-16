@@ -5,12 +5,8 @@
 #ifndef COMPILER_LIB_H
 #define COMPILER_LIB_H
 
-using namespace std;
 #include "lexer/lib.h"
 #include "paser/lib.h"
 #include "semanticAnalyzer/lib.h"
-
-#include "iostream"
-#include "fstream"
-#include "string"
+#include "llvmBuilder/lib.h"
 #endif //COMPILER_LIB_H

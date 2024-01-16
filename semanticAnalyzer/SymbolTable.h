@@ -14,8 +14,8 @@ using namespace std;
 class SymbolTable {
     SymbolTable *parent_;
     vector<SymbolTable *> children = {};
-    unordered_map<string, Symbol*> symbols = {};
-
+    unordered_map<string, Symbol *> symbols = {};
+    int childNum = 0;
 public:
     explicit SymbolTable() : parent_(nullptr) {}
 
@@ -28,39 +28,72 @@ public:
     }
 
     bool isIdentInAllTables(string token) {
-        unordered_map<string, Symbol*>* symbolsToFind = &symbols;
-        SymbolTable* parent= parent_;
+        unordered_map<string, Symbol *> *symbolsToFind = &symbols;
+        SymbolTable *parent = parent_;
         if (symbolsToFind->find(token) != symbolsToFind->end())
             return true;
         while (parent != nullptr) {
             symbolsToFind = parent->getSymbols();
             if (symbolsToFind->find(token) != symbolsToFind->end())
                 return true;
-            parent=parent->getParents();
+            parent = parent->getParents();
         }
         return false;
     }
 
-    Symbol* findIdentInAllTables(string token){
-        unordered_map<string, Symbol*> *symbolsToFind = &symbols;
-        SymbolTable* parent= parent_;
+    bool isIdentGlobal(string token) {
+        unordered_map<string, Symbol *> *symbolsToFind = &symbols;
+        SymbolTable *parent = parent_;
+        if (symbolsToFind->find(token) != symbolsToFind->end()) { //找到了
+            if (parent == nullptr) {
+                return true;
+            }
+            return false;
+        }
+        while (parent != nullptr) {
+            symbolsToFind = parent->getSymbols();
+            if (symbolsToFind->find(token) != symbolsToFind->end()) { //找到了
+                return false;
+            }
+            parent = parent->getParents();
+        }
+        return false;
+    }
+
+    Symbol *findIdentInAllTables(string token) {
+        unordered_map<string, Symbol *> *symbolsToFind = &symbols;
+        SymbolTable *parent = parent_;
         if (symbolsToFind->find(token) != symbolsToFind->end())
             return symbolsToFind->at(token);
         while (parent != nullptr) {
             symbolsToFind = parent->getSymbols();
             if (symbolsToFind->find(token) != symbolsToFind->end())
                 return symbolsToFind->at(token);
-            parent=parent->getParents();
+            parent = parent->getParents();
         }
         return nullptr;
     }
+
+    //这个是用来处理int a=a+1的情况
+    Symbol *findIdentInParentTable(string token) {
+        unordered_map<string, Symbol *> *symbolsToFind = &symbols;
+        SymbolTable *parent = parent_;
+        while (parent != nullptr) {
+            symbolsToFind = parent->getSymbols();
+            if (symbolsToFind->find(token) != symbolsToFind->end())
+                return symbolsToFind->at(token);
+            parent = parent->getParents();
+        }
+        return nullptr;
+    }
+
 
     void addSymbolTable(SymbolTable *child) {
         children.push_back(child);
     }
 
     void addSymbol(Node *node, Symbol::Type type) {
-        Symbol* symbol=new Symbol(node, type);
+        Symbol *symbol = new Symbol(node, type);
         symbols.insert(make_pair(node->getPureToken(), symbol));
     }
 
@@ -76,8 +109,13 @@ public:
         return symbols.at(name);
     }
 
-    unordered_map<string, Symbol*> *getSymbols() {
+    unordered_map<string, Symbol *> *getSymbols() {
         return &symbols;
+    }
+
+    //中间代码生成分配child
+    SymbolTable *allocChild() {
+        return children.at(childNum++);
     }
 };
 

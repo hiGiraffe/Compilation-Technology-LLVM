@@ -25,6 +25,8 @@ class SemanticAnalyzer {
     map<int, string> &errorLog_;
     Node *ancestor;
     SymbolTable *curTable = new SymbolTable();
+    SymbolTable *ancestorTable = curTable;
+    int labelNum = 0;
 public:
     explicit SemanticAnalyzer(
             Parser parser,
@@ -40,8 +42,26 @@ public:
         return os;
     }
 
+    SymbolTable *getAncestorTable() {
+        return ancestorTable;
+    }
+
+    Node *getAncestorNode() {
+        return ancestor;
+    }
+
     void error() {
         cout << "error" << endl;
+    }
+
+    //申请跳转label
+    string allocLabel() {
+        return "label" + to_string(labelNum++);
+    }
+
+    bool isLabel(Node *curNode) {
+        return curNode->getParent()->getType() == LexicalType::LAndExp
+               && curNode->getParent()->getParent()->getType() == LexicalType::LOrExp;
     }
 
     //    编译单元    CompUnit → {Decl} {FuncDef} MainFuncDef   Decl → ConstDecl | VarDecl
@@ -249,6 +269,9 @@ public:
             errorLog_.insert(make_pair(rbraceNode->getLine(), //}的行数
                                        errorTypeToPrint(ErrorType::ReturnMissing)));
         }
+        Symbol *symbol = new Symbol(child(1), Symbol::Type::FUNCTION_INT);
+        curTable->addSymbol(symbol);
+
         //读Table
         SymbolTable *child = new SymbolTable(curTable);
         curTable->addSymbolTable(child);
@@ -360,10 +383,18 @@ public:
             curTable = curTable->getParents();
         } else if (curChildType == LexicalType::IFTK) {
             analyzeCond(child(2));
+            //分配if成立的stmt的label
+            child(4)->setLabel(allocLabel());
             analyzeStmt(child(4));
+
+
             if (parents->getSize() > 5) {
+                //分配else成立的stmt的label
+                child(6)->setLabel(allocLabel());
                 analyzeStmt(child(6));
             }
+            //分配if结束的label到IFTK处
+            child(0)->setLabel(allocLabel());
         } else if (curChildType == LexicalType::FORTK) {
             //'for' '('[ForStmt] ';' [Cond] ';' [ForStmt] ')' Stmt
             cur++;
@@ -374,16 +405,24 @@ public:
             }
             cur++;
             if (curChildToken != ";") {
+                //分配Cond的label
+                curChild->setLabel(allocLabel());
                 analyzeCond(curChild);
                 cur++;
             }
             cur++;
             if (curChildToken != ";" && curChildToken != ")") {
+                //分配ForStmt2的label
+                curChild->setLabel(allocLabel());
                 analyzeForStmt(curChild);
                 cur++;
             }
             cur++;
+            //分配cond成立跳转的stmt的label
+            curChild->setLabel(allocLabel());
             analyzeStmt(curChild);
+            //分配退出的label
+            child(0)->setLabel(allocLabel());
         } else if (curChildType == LexicalType::BREAKTK || curChildType == LexicalType::CONTINUETK) {
             checkRedundantBreakAndContinue(curChild);
         } else if (curChildType == LexicalType::RETURNTK && child(cur + 1)->getPureToken() != ";") {
@@ -392,10 +431,10 @@ public:
 //            'printf''('FormatString{,Exp}')'';' // i j l
             int numExp = (parents->getSize() - 5) / 2;
             checkFormatStrNumNotMatch(child(2), numExp);
-            cur=3;
+            cur = 3;
             for (int i = 0; i < numExp; i++) {
                 cur++;
-                analyzeExp(curChild,nullptr);
+                analyzeExp(curChild, nullptr);
                 cur++;
             }
         }
@@ -545,6 +584,22 @@ public:
         }
     }
 
+    //确定参数类型
+    bool checkTypeOfParamSame(Symbol::Type A, Symbol::Type B) {
+        if (A == Symbol::Type::VAR || A == Symbol::Type::VAR_CONST) {
+            if (B == Symbol::Type::VAR || B == Symbol::Type::VAR_CONST)
+                return true;
+        } else if (A == Symbol::Type::ONE_DIMENSION || A == Symbol::Type::ONE_DIMENSION_CONST) {
+            if (B == Symbol::Type::ONE_DIMENSION || B == Symbol::Type::ONE_DIMENSION_CONST)
+                return true;
+        } else if (A == Symbol::Type::TWO_DIMENSIONS || A == Symbol::Type::TWO_DIMENSIONS_CONST) {
+            if (B == Symbol::Type::TWO_DIMENSIONS || B == Symbol::Type::TWO_DIMENSIONS_CONST)
+                return true;
+        } else {
+            return false;
+        }
+    }
+
     //            数值  Number → IntConst
     void analyzeNumber(Node *parents) {
         int cur = 0;
@@ -577,18 +632,17 @@ public:
                             make_pair(curChildLine, errorTypeToPrint(ErrorType::NumOfFunctionParametersNotMatch)));
                 } else {
                     for (int i = 0; i < definedIdent->getSizeOfParams(); i++) {
-                        if (definedIdent->getTypeAt(i) != calledIdent->getTypeAt(i)) {
+                        if (!checkTypeOfParamSame(definedIdent->getTypeAt(i), calledIdent->getTypeAt(i))) {
                             errorLog_.insert(make_pair(curChildLine,
                                                        errorTypeToPrint(ErrorType::TypeOfFunctionParametersNotMatch)));
                         }
                     }
                 }
-                if (type != nullptr){
-                    if(definedIdent->getType()==Symbol::Type::FUNCTION_INT){
+                if (type != nullptr) {
+                    if (definedIdent->getType() == Symbol::Type::FUNCTION_INT) {
                         *type = Symbol::Type::VAR;
-                    }
-                    else{
-                        *type=Symbol::Type::NOTHING;
+                    } else {
+                        *type = Symbol::Type::NOTHING;
                     }
                 }
 
@@ -667,6 +721,9 @@ public:
 
     //            相等性表达式  EqExp → RelExp | EqExp ('==' | '!=') RelExp
     void analyzeEqExp(Node *parents) {
+        if (isLabel(parents)) {
+            parents->setLabel(allocLabel());
+        }
         int cur = 0;
         if (curChildType == LexicalType::RelExp) {
             analyzeRelExp(curChild);
@@ -682,6 +739,9 @@ public:
 
     //            逻辑与表达式  LAndExp → EqExp | LAndExp '&&' EqExp
     void analyzeLAndExp(Node *parents) {
+        if (isLabel(parents)) {
+            parents->setLabel(allocLabel());
+        }
         int cur = 0;
         if (curChildType == LexicalType::EqExp) {
             analyzeEqExp(curChild);
@@ -692,6 +752,9 @@ public:
                 cur++;
             }
             analyzeEqExp(curChild);
+        }
+        if (parents->getLabel().size() == 0) {
+            parents->setLabel(child(0)->getLabel());
         }
     }
 
@@ -707,6 +770,9 @@ public:
                 cur++;
             }
             analyzeLAndExp(curChild);
+        }
+        if (parents->getLabel().size() == 0) {
+            parents->setLabel(child(0)->getLabel());
         }
     }
 
